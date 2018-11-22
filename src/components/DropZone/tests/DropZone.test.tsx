@@ -1,5 +1,7 @@
 import * as React from 'react';
-import {Label, Labelled} from 'components';
+import {ReactWrapper} from 'enzyme';
+import {clock} from '@shopify/jest-dom-mocks';
+import {Label, Labelled, DisplayText, Caption} from 'components';
 import {mountWithAppProvider} from 'test-utilities';
 import DropZone from '../DropZone';
 
@@ -9,6 +11,13 @@ describe('<DropZone />', () => {
   let acceptedFiles: {}[];
   let rejectedFiles: {}[];
   let createEvent: any;
+  let origGetBoundingClientRect: any;
+  const widths = {
+    small: 99,
+    medium: 159,
+    large: 299,
+    extraLarge: 1024,
+  };
 
   const fireEvent = (eventType: string, element: any) => {
     spy.mockReset();
@@ -16,8 +25,30 @@ describe('<DropZone />', () => {
     element.getDOMNode().dispatchEvent(event);
   };
 
+  const setBoundingClientRect = (size: keyof typeof widths) => {
+    origGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = jest.fn(() => {
+      return {
+        width: widths[size],
+        height: 100,
+        top: 0,
+        left: 0,
+        bottom: 0,
+        right: 0,
+      };
+    });
+  };
+
+  const triggerDragEnter = (element: ReactWrapper<any, any>) => {
+    const event = createEvent('dragenter');
+    element.getDOMNode().dispatchEvent(event);
+    clock.tick(50);
+    element.update();
+  };
+
   beforeEach(() => {
     spy = jest.fn();
+    clock.mock();
     files = [
       {
         name: 'jpeg file',
@@ -40,6 +71,11 @@ describe('<DropZone />', () => {
     };
   });
 
+  afterEach(() => {
+    clock.restore();
+    Element.prototype.getBoundingClientRect = origGetBoundingClientRect;
+  });
+
   it('calls the onDrop callback when a drop event is fired', () => {
     const dropZone = mountWithAppProvider(<DropZone onDrop={spy} />);
     const event = createEvent('drop');
@@ -54,7 +90,7 @@ describe('<DropZone />', () => {
     expect(spy).toBeCalledWith(files, files, []);
   });
 
-  it('calls the onDrop callback corrently when it accepts only jpeg', () => {
+  it('calls the onDrop callback correctly when it accepts only jpeg', () => {
     const dropZone = mountWithAppProvider(
       <DropZone onDrop={spy} accept="image/jpeg" />,
     );
@@ -63,7 +99,7 @@ describe('<DropZone />', () => {
     expect(spy).toBeCalledWith(files, acceptedFiles, rejectedFiles);
   });
 
-  it('calls the onDropAccepted callback corrently when it accepts only jpeg', () => {
+  it('calls the onDropAccepted callback correctly when it accepts only jpeg', () => {
     const dropZone = mountWithAppProvider(
       <DropZone onDropAccepted={spy} accept="image/jpeg" />,
     );
@@ -72,7 +108,7 @@ describe('<DropZone />', () => {
     expect(spy).toBeCalledWith(acceptedFiles);
   });
 
-  it('calls the onDropRejected callback corrently when it accepts only jpeg', () => {
+  it('calls the onDropRejected callback correctly when it accepts only jpeg', () => {
     const dropZone = mountWithAppProvider(
       <DropZone onDropRejected={spy} accept="image/jpeg" />,
     );
@@ -205,6 +241,96 @@ describe('<DropZone />', () => {
         'labelHidden',
         true,
       );
+    });
+  });
+
+  describe('overlayText', () => {
+    const overlayText = 'overlay text';
+    it("doesn't renders the overlayText on small screens", () => {
+      setBoundingClientRect('small');
+      const dropZone = mountWithAppProvider(
+        <DropZone overlayText={overlayText} />,
+      );
+      triggerDragEnter(dropZone);
+      const displayText = dropZone.find(DisplayText);
+      const caption = dropZone.find(Caption);
+      expect(displayText).toHaveLength(0);
+      expect(caption).toHaveLength(0);
+    });
+
+    it('renders a Caption containing the overlayText on medium screens', () => {
+      setBoundingClientRect('medium');
+      const dropZone = mountWithAppProvider(
+        <DropZone overlayText={overlayText} />,
+      );
+      triggerDragEnter(dropZone);
+      const captionText = dropZone.find(Caption);
+      expect(captionText.contains(overlayText)).toBe(true);
+    });
+
+    it('renders a Caption containing the overlayText on large screens', () => {
+      setBoundingClientRect('large');
+      const dropZone = mountWithAppProvider(
+        <DropZone overlayText={overlayText} />,
+      );
+      triggerDragEnter(dropZone);
+      const captionText = dropZone.find(Caption);
+      expect(captionText.contains(overlayText)).toBe(true);
+    });
+
+    it('renders a DisplayText containing the overlayText on extra-large screens', () => {
+      setBoundingClientRect('extraLarge');
+      const dropZone = mountWithAppProvider(
+        <DropZone overlayText={overlayText} />,
+      );
+      triggerDragEnter(dropZone);
+      const displayText = dropZone.find(DisplayText);
+      expect(displayText.contains(overlayText)).toBe(true);
+    });
+  });
+
+  describe('errorOverlayText ', () => {
+    const errorOverlayText = "can't drop this";
+    it("doesn't render the overlayText on small screens", () => {
+      setBoundingClientRect('small');
+      const dropZone = mountWithAppProvider(
+        <DropZone errorOverlayText={errorOverlayText} accept="image/gif" />,
+      );
+      triggerDragEnter(dropZone);
+      const displayText = dropZone.find(DisplayText);
+      const caption = dropZone.find(Caption);
+      expect(displayText).toHaveLength(0);
+      expect(caption).toHaveLength(0);
+    });
+
+    it('renders a Caption containing the overlayText on medium screens', () => {
+      setBoundingClientRect('medium');
+      const dropZone = mountWithAppProvider(
+        <DropZone errorOverlayText={errorOverlayText} accept="image/gif" />,
+      );
+      triggerDragEnter(dropZone);
+      const captionText = dropZone.find(Caption);
+      expect(captionText.contains(errorOverlayText)).toBe(true);
+    });
+
+    it('renders a Caption containing the overlayText on large screens', () => {
+      setBoundingClientRect('large');
+      const dropZone = mountWithAppProvider(
+        <DropZone errorOverlayText={errorOverlayText} accept="image/gif" />,
+      );
+      triggerDragEnter(dropZone);
+      const captionText = dropZone.find(Caption);
+      expect(captionText.contains(errorOverlayText)).toBe(true);
+    });
+
+    it('renders a DisplayText containing the overlayText on extra-large screens', () => {
+      setBoundingClientRect('extraLarge');
+      const dropZone = mountWithAppProvider(
+        <DropZone errorOverlayText={errorOverlayText} accept="image/gif" />,
+      );
+      triggerDragEnter(dropZone);
+      const displayText = dropZone.find(DisplayText);
+      expect(displayText.contains(errorOverlayText)).toBe(true);
     });
   });
 });
